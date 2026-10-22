@@ -113,6 +113,7 @@ def normalize_title(value: str) -> str:
 def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -> dict | None:
     """Resolve an exact Douban subject during feed generation; never guess by similarity."""
     wanted = {normalize_title(title) for title in titles if normalize_title(title)}
+    original_titles = {normalize_title(title) for title in titles[1:] if normalize_title(title)}
     queries = list(dict.fromkeys(title.strip() for title in titles if title and title.strip()))
     for query in queries:
         url = "https://movie.douban.com/j/subject_suggest?" + urllib.parse.urlencode({"q": query})
@@ -139,6 +140,7 @@ def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -
             }
             if not wanted.intersection(candidate_titles):
                 continue
+            candidate["_original_title_match"] = bool(original_titles.intersection(candidate_titles))
             candidate_type = str(candidate.get("type") or "").casefold()
             if candidate_type and media_type == "movie" and candidate_type not in {"movie", "film"}:
                 continue
@@ -153,7 +155,7 @@ def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -
             ]
             if same_year:
                 exact = same_year
-            elif any(item.get("year") for item in exact):
+            elif exact and all(item.get("year") for item in exact) and not any(item.get("_original_title_match") for item in exact):
                 continue
         # If multiple same-title subjects remain, leave the link unresolved.
         ids = {str(item["id"]) for item in exact}
