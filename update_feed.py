@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -104,6 +105,82 @@ def tmdb_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}", "Accept": "application/json"}
 
 
+def normalize_title(value: str) -> str:
+    value = unicodedata.normalize("NFKC", value).casefold()
+    return "".join(char for char in value if char.isalnum())
+
+
+def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -> dict | None:
+    """Resolve an exact Douban subject during feed generation; never guess by similarity."""
+    wanted = {normalize_title(title) for title in titles if normalize_title(title)}
+    queries = list(dict.fromkeys(title.strip() for title in titles if title and title.strip()))
+    for query in queries:
+        url = "https://movie.douban.com/j/subject_suggest?" + urllib.parse.urlencode({"q": query})
+        request = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; GlobalFilmRelease/1.0)",
+            "Referer": "https://movie.douban.com/",
+            "Accept": "application/json",
+        })
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                candidates = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError) as exc:
+            print(f"Douban lookup unavailable for {query!r}: {exc}")
+            continue
+        if not isinstance(candidates, list):
+            continue
+        exact = []
+        for candidate in candidates:
+            if not isinstance(candidate, dict) or not candidate.get("id"):
+                continue
+            if normalize_title(str(candidate.get("title") or "")) not in wanted:
+                continue
+            candidate_type = str(candidate.get("type") or "").casefold()
+            if candidate_type and media_type == "movie" and candidate_type not in {"movie", "film"}:
+                continue
+            if candidate_type and media_type == "tv" and candidate_type not in {"tv", "tv show", "tv series", "series"}:
+                continue
+            exact.append(candidate)
+        if year:
+            same_year = [item for item in exact if str(item.get("year") or "") == year]
+            if same_year:
+                exact = same_year
+            elif any(item.get("year") for item in exact):
+                continue
+        # If multiple same-title subjects remain, leave the link unresolved.
+        ids = {str(item["id"]) for item in exact}
+        if len(ids) != 1:
+            continue
+        result = next(item for item in exact if str(item["id"]) in ids)
+        subject_id = str(result["id"])
+        return {
+            "doubanId": subject_id,
+            "doubanUrl": f"https://movie.douban.com/subject/{subject_id}/",
+            "doubanPosterUrl": str(result.get("pic") or result.get("img") or ""),
+        }
+    return None
+
+
+def load_existing_douban_mappings() -> tuple[dict[str, dict], dict[str, dict]]:
+    """Reuse verified links so unchanged works do not hit Douban again every day."""
+    try:
+        with open("releases.json", encoding="utf-8") as source:
+            old_films = json.load(source).get("films", {})
+    except (OSError, ValueError, TypeError):
+        return {}, {}
+    movies: dict[str, dict] = {}
+    shows: dict[str, dict] = {}
+    for item_id, item in old_films.items():
+        if not isinstance(item, dict) or not item.get("doubanId"):
+            continue
+        mapping = {key: item[key] for key in ("doubanId", "doubanUrl", "doubanPosterUrl") if item.get(key)}
+        if item.get("tmdbId"):
+            movies[str(item["tmdbId"])] = mapping
+        elif item_id.startswith("tvmaze-"):
+            shows[item_id.split("-", 2)[1]] = mapping
+    return movies, shows
+
+
 def get_movie_candidates(token: str, start: dt.date, end: dt.date) -> list[dict]:
     headers = tmdb_headers(token)
     candidates: dict[tuple[int, str, int], dict] = {}
@@ -193,7 +270,7 @@ def tvmaze_days(start: dt.date, end: dt.date) -> list[tuple[str, dt.date, dict]]
     return found
 
 
-def build_tv_items(rows: list[tuple[str, dt.date, dict]], films: dict, areas: dict, kinds: dict, sources: dict):
+def build_tv_items(rows: list[tuple[str, dt.date, dict]], films: dict, areas: dict, kinds: dict, sources: dict, douban_by_show: dict[str, dict]):
     for country, air_date, episode in rows:
         show = episode.get("show") or {}
         show_id = show.get("id")
@@ -218,6 +295,9 @@ def build_tv_items(rows: list[tuple[str, dt.date, dict]], films: dict, areas: di
             "posterUrl": image,
             "summary": (f"{plain_text(episode_name)}{episode_suffix}。" if episode_name else f"更新{episode_suffix}。") + summary,
         }
+        if douban_by_show.get(str(show_id)):
+            films[item_id].update(douban_by_show[str(show_id)])
+        films[item_id]["tvmazeId"] = str(show_id)
         country_info = (channel.get("country") or {}).get("code") or country
         areas[item_id] = area_for([country_info], show.get("language", ""))
         kinds[item_id] = "电视剧"
@@ -238,6 +318,7 @@ def main() -> int:
     kinds: dict[str, str] = {}
     sources: dict[str, str] = {}
     cross_sources: dict[str, str] = {}
+    old_movie_links, old_show_links = load_existing_douban_mappings()
 
     movies = get_movie_candidates(token, movie_start, movie_end)
     print(f"TMDB candidate releases: {len(movies)}")
@@ -245,20 +326,52 @@ def main() -> int:
         movie_ids = sorted({int(movie["id"]) for movie in movies})
         detail_rows = pool.map(lambda movie_id: (movie_id, fetch_json(f"{TMDB}/movie/{movie_id}?language=zh-CN", tmdb_headers(token))), movie_ids)
         details_by_id = dict(detail_rows)
-        for movie in movies:
-            item, area, source = movie_record(movie, details_by_id[int(movie["id"])])
-            key = f"tmdb-{movie['id']}-{movie['market'].lower()}-{movie['releaseTypeId']}-{movie['dateISO']}"
-            films[key] = item
-            areas[key] = area
-            kinds[key] = "电影"
-            sources[key] = source
+    movie_douban: dict[str, dict] = dict(old_movie_links)
+    missing_movie_ids = [movie_id for movie_id in movie_ids if str(movie_id) not in movie_douban]
+    def lookup_movie(movie_id: int):
+        detail = details_by_id[movie_id]
+        title = plain_text(detail.get("title") or "")
+        original = plain_text(detail.get("original_title") or title)
+        release_year = str((detail.get("release_date") or "")[:4])
+        return str(movie_id), douban_match([title, original], release_year, "movie")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        for tmdb_id, match in pool.map(lookup_movie, missing_movie_ids):
+            if match:
+                movie_douban[tmdb_id] = match
+    matched_movie_count = 0
+    for movie in movies:
+        item, area, source = movie_record(movie, details_by_id[int(movie["id"])])
+        key = f"tmdb-{movie['id']}-{movie['market'].lower()}-{movie['releaseTypeId']}-{movie['dateISO']}"
+        if movie_douban.get(str(movie["id"])):
+            item.update(movie_douban[str(movie["id"])])
+            matched_movie_count += 1
+        films[key] = item
+        areas[key] = area
+        kinds[key] = "电影"
+        sources[key] = source
 
     # Episode schedules are refreshed daily; TMDB release calendar records are
     # retained for the full 90-day window.
     tv_start = today - dt.timedelta(days=7)
     rows = tvmaze_days(tv_start, tv_end)
     print(f"TVmaze scheduled episode releases: {len(rows)}")
-    build_tv_items(rows, films, areas, kinds, sources)
+    show_candidates: dict[str, tuple[str, str]] = {}
+    for _, _, episode in rows:
+        show = episode.get("show") or {}
+        show_id = show.get("id")
+        if show_id is not None and str(show_id) not in old_show_links:
+            show_candidates[str(show_id)] = (plain_text(show.get("name") or ""), str((show.get("premiered") or "")[:4]))
+    def lookup_show(entry: tuple[str, tuple[str, str]]):
+        show_id, (title, year) = entry
+        return show_id, douban_match([title], year, "tv")
+    show_douban: dict[str, dict] = dict(old_show_links)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        for show_id, match in pool.map(lookup_show, show_candidates.items()):
+            if match:
+                show_douban[show_id] = match
+    matched_show_count = len(show_douban)
+    build_tv_items(rows, films, areas, kinds, sources, show_douban)
+    print(f"Douban exact matches: {matched_movie_count} movie records / {len(movie_douban)} unique films, {matched_show_count} TV shows")
 
     payload = {
         "updatedAt": dt.datetime.now(BEIJING).isoformat(timespec="seconds"),
