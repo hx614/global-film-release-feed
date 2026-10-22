@@ -1,4 +1,17 @@
 {
+  "completeSnapshot": true,
+  "attribution": [
+    {
+      "name": "TMDB",
+      "url": "https://www.themoviedb.org/",
+      "text": "This product uses the TMDB API but is not endorsed or certified by TMDB."
+    },
+    {
+      "name": "TVmaze",
+      "url": "https://www.tvmaze.com/",
+      "text": "TV schedule data provided by TVmaze."
+    }
+  ],
   "films": {
     "tenzing": {
       "title": "登峰传奇：丹增诺盖",
