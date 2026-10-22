@@ -133,7 +133,11 @@ def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -
         for candidate in candidates:
             if not isinstance(candidate, dict) or not candidate.get("id"):
                 continue
-            if normalize_title(str(candidate.get("title") or "")) not in wanted:
+            candidate_titles = {
+                normalize_title(str(candidate.get("title") or "")),
+                normalize_title(str(candidate.get("sub_title") or "")),
+            }
+            if not wanted.intersection(candidate_titles):
                 continue
             candidate_type = str(candidate.get("type") or "").casefold()
             if candidate_type and media_type == "movie" and candidate_type not in {"movie", "film"}:
