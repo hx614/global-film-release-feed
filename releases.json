@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-22T17:54:26+08:00",
+  "updatedAt": "2026-10-22T18:02:04+08:00",
   "completeSnapshot": true,
   "attribution": [
     {
@@ -419,7 +419,7 @@
       "region": "中国大陆",
       "posterUrl": "https://image.tmdb.org/t/p/w500/1UwccbiDQo7q2XYGm7IKNjK4LYG.jpg",
       "tmdbId": "1800640",
-      "tmdbRating": "",
+      "tmdbRating": "1.0/10",
       "summary": "黑白无常现身长安赏善罚恶，引发百姓恐慌。狄仁杰调查后发现，二者实为被施法控制的人所假扮。随着调查深入，他逐渐揭开波斯遗民利用拜火教圣物“不死之刃”秘密打造不死军、企图复国的阴谋。"
     },
     "tmdb-1702511-cn-4-2026-10-30": {
@@ -2048,7 +2048,10 @@
       "tmdbId": "1765072",
       "tmdbRating": "8.9/10",
       "summary": "在被判入狱前的34天，臭名昭著的硅谷创始人伊丽莎白·霍姆斯邀请了一支持怀疑态度的摄制组记录她的一举一动。起初这是一部关于神秘罪犯的私密肖像，却演变成一场持续3年、坠入深渊的迷幻之旅。",
-      "imdbId": "tt45368240"
+      "imdbId": "tt45368240",
+      "doubanId": "38643086",
+      "doubanUrl": "https://movie.douban.com/subject/38643086/",
+      "doubanPosterUrl": "https://img9.doubanio.com/view/photo/s_ratio_poster/public/p2936729175.jpg"
     },
     "tmdb-1503762-us-3-2026-10-16": {
       "title": "理智与情感",
@@ -2142,7 +2145,7 @@
       "region": "美国",
       "posterUrl": "https://image.tmdb.org/t/p/w500/lNXeEpg4yLSRwXwOeR5lbPgwbqL.jpg",
       "tmdbId": "1376400",
-      "tmdbRating": "6.0/10",
+      "tmdbRating": "5.5/10",
       "summary": "一种剧毒蜘蛛入侵高层公寓，警方紧急封锁整栋大楼，住户全部被困。公寓管理员赛琳娜熟悉楼宇每一处通道，但她本身极度惧怕蜘蛛。毒虫不断增殖，在墙体与管道间四处猎捕幸存者，她只能凭借对大楼的了解，带领居民在封闭牢笼里拼死求生。",
       "imdbId": "tt32329539"
     },
@@ -2816,7 +2819,10 @@
       "tmdbId": "1512493",
       "tmdbRating": "",
       "summary": "一个小女孩用乐高积木搭建了一个世界，却突然发现自己竟置身于心湖城 — 在那里，冒险和友谊正等着她！",
-      "imdbId": "tt37538335"
+      "imdbId": "tt37538335",
+      "doubanId": "38925625",
+      "doubanUrl": "https://movie.douban.com/subject/38925625/",
+      "doubanPosterUrl": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2936718457.jpg"
     },
     "tmdb-1773759-us-4-2026-10-16": {
       "title": "单身多专家",
@@ -3474,7 +3480,10 @@
       "tmdbId": "1765072",
       "tmdbRating": "8.9/10",
       "summary": "在被判入狱前的34天，臭名昭著的硅谷创始人伊丽莎白·霍姆斯邀请了一支持怀疑态度的摄制组记录她的一举一动。起初这是一部关于神秘罪犯的私密肖像，却演变成一场持续3年、坠入深渊的迷幻之旅。",
-      "imdbId": "tt45368240"
+      "imdbId": "tt45368240",
+      "doubanId": "38643086",
+      "doubanUrl": "https://movie.douban.com/subject/38643086/",
+      "doubanPosterUrl": "https://img9.doubanio.com/view/photo/s_ratio_poster/public/p2936729175.jpg"
     },
     "tmdb-858035-gb-3-2026-10-23": {
       "title": "克拉拉与太阳",
@@ -3568,7 +3577,7 @@
       "region": "英国",
       "posterUrl": "https://image.tmdb.org/t/p/w500/lNXeEpg4yLSRwXwOeR5lbPgwbqL.jpg",
       "tmdbId": "1376400",
-      "tmdbRating": "6.0/10",
+      "tmdbRating": "5.5/10",
       "summary": "一种剧毒蜘蛛入侵高层公寓，警方紧急封锁整栋大楼，住户全部被困。公寓管理员赛琳娜熟悉楼宇每一处通道，但她本身极度惧怕蜘蛛。毒虫不断增殖，在墙体与管道间四处猎捕幸存者，她只能凭借对大楼的了解，带领居民在封闭牢笼里拼死求生。",
       "imdbId": "tt32329539"
     },
@@ -3918,7 +3927,10 @@
       "tmdbId": "1512493",
       "tmdbRating": "",
       "summary": "一个小女孩用乐高积木搭建了一个世界，却突然发现自己竟置身于心湖城 — 在那里，冒险和友谊正等着她！",
-      "imdbId": "tt37538335"
+      "imdbId": "tt37538335",
+      "doubanId": "38925625",
+      "doubanUrl": "https://movie.douban.com/subject/38925625/",
+      "doubanPosterUrl": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2936718457.jpg"
     },
     "tmdb-1393326-gb-4-2026-10-26": {
       "title": "牢笼鬼魂",
@@ -4169,7 +4181,10 @@
       "tmdbId": "1507696",
       "tmdbRating": "",
       "summary": "致命TSJ病毒摧毁人类文明，加那利群岛侥幸躲过灾难，成为欧洲大陆幸存者最后的庇护所。一支小队受命重返危机四伏的伊比利亚半岛执行补给任务，心存私心的罗伯托加入队伍。任务迅速演变为一场残酷的生存竞速，小队要在丧尸潮与内部立场分裂的夹缝中挣扎求生，所有人都要直面终极抉择：保全自己，还是冒着一切风险守护残存的人类文明。",
-      "imdbId": "tt37522541"
+      "imdbId": "tt37522541",
+      "doubanId": "37443035",
+      "doubanUrl": "https://movie.douban.com/subject/37443035/",
+      "doubanPosterUrl": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2936526530.jpg"
     },
     "tmdb-1629051-gb-4-2026-11-02": {
       "title": "入夜不再",
@@ -6118,7 +6133,10 @@
       "tmdbId": "1512493",
       "tmdbRating": "",
       "summary": "一个小女孩用乐高积木搭建了一个世界，却突然发现自己竟置身于心湖城 — 在那里，冒险和友谊正等着她！",
-      "imdbId": "tt37538335"
+      "imdbId": "tt37538335",
+      "doubanId": "38925625",
+      "doubanUrl": "https://movie.douban.com/subject/38925625/",
+      "doubanPosterUrl": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2936718457.jpg"
     },
     "tmdb-1773759-kr-4-2026-10-16": {
       "title": "单身多专家",
@@ -7638,7 +7656,7 @@
       "region": "泰国",
       "posterUrl": "https://image.tmdb.org/t/p/w500/lNXeEpg4yLSRwXwOeR5lbPgwbqL.jpg",
       "tmdbId": "1376400",
-      "tmdbRating": "6.0/10",
+      "tmdbRating": "5.5/10",
       "summary": "一种剧毒蜘蛛入侵高层公寓，警方紧急封锁整栋大楼，住户全部被困。公寓管理员赛琳娜熟悉楼宇每一处通道，但她本身极度惧怕蜘蛛。毒虫不断增殖，在墙体与管道间四处猎捕幸存者，她只能凭借对大楼的了解，带领居民在封闭牢笼里拼死求生。",
       "imdbId": "tt32329539"
     },
@@ -8281,7 +8299,7 @@
       "region": "新加坡",
       "posterUrl": "https://image.tmdb.org/t/p/w500/lNXeEpg4yLSRwXwOeR5lbPgwbqL.jpg",
       "tmdbId": "1376400",
-      "tmdbRating": "6.0/10",
+      "tmdbRating": "5.5/10",
       "summary": "一种剧毒蜘蛛入侵高层公寓，警方紧急封锁整栋大楼，住户全部被困。公寓管理员赛琳娜熟悉楼宇每一处通道，但她本身极度惧怕蜘蛛。毒虫不断增殖，在墙体与管道间四处猎捕幸存者，她只能凭借对大楼的了解，带领居民在封闭牢笼里拼死求生。",
       "imdbId": "tt32329539"
     },
@@ -8487,7 +8505,10 @@
       "tmdbId": "1507877",
       "tmdbRating": "7.1/10",
       "summary": "才华横溢的年轻演员嘉朗丝有着浑然天成的魅力和活力无限的精神，但还未赢得她所渴望的认可。她住在巴黎一间狭小的公寓，勉强维持生计，人生被短暂即逝的关系、越发严重的焦虑和酒瘾萦绕。她要照顾染病的妹妹，又与波琳展开了一段柔软的爱情，一切是那么脆弱。而随着这些纽带的加深，她找到了力量去面对此前一直躲避的内心阴影，踏上了一场艰难但革新性的自我更新之旅。",
-      "imdbId": "tt38584405"
+      "imdbId": "tt38584405",
+      "doubanId": "37521904",
+      "doubanUrl": "https://movie.douban.com/subject/37521904/",
+      "doubanPosterUrl": "https://img9.doubanio.com/view/photo/s_ratio_poster/public/p2935335705.jpg"
     },
     "tmdb-1591675-sg-3-2026-10-29": {
       "title": "蓦然回首",
@@ -8943,7 +8964,10 @@
       "tmdbId": "1507696",
       "tmdbRating": "",
       "summary": "致命TSJ病毒摧毁人类文明，加那利群岛侥幸躲过灾难，成为欧洲大陆幸存者最后的庇护所。一支小队受命重返危机四伏的伊比利亚半岛执行补给任务，心存私心的罗伯托加入队伍。任务迅速演变为一场残酷的生存竞速，小队要在丧尸潮与内部立场分裂的夹缝中挣扎求生，所有人都要直面终极抉择：保全自己，还是冒着一切风险守护残存的人类文明。",
-      "imdbId": "tt37522541"
+      "imdbId": "tt37522541",
+      "doubanId": "37443035",
+      "doubanUrl": "https://movie.douban.com/subject/37443035/",
+      "doubanPosterUrl": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2936526530.jpg"
     },
     "tmdb-1795934-sg-4-2026-10-20": {
       "title": "西奥·冯：我很好",
