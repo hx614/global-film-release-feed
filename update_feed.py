@@ -111,64 +111,73 @@ def normalize_title(value: str) -> str:
 
 
 def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -> dict | None:
-    """Resolve an exact Douban subject during feed generation; never guess by similarity."""
+    """Resolve one exact Douban subject, retrying through a fetch proxy if needed."""
     wanted = {normalize_title(title) for title in titles if normalize_title(title)}
     original_titles = {normalize_title(title) for title in titles[1:] if normalize_title(title)}
     queries = list(dict.fromkeys(title.strip() for title in titles if title and title.strip()))
     for query in queries:
-        url = "https://movie.douban.com/j/subject_suggest?" + urllib.parse.urlencode({"q": query})
-        request = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
-            "Referer": "https://movie.douban.com/",
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        })
-        try:
-            with urllib.request.urlopen(request, timeout=10) as response:
-                candidates = json.loads(response.read().decode("utf-8"))
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError) as exc:
-            print(f"Douban lookup unavailable for {query!r}: {exc}")
-            continue
-        if not isinstance(candidates, list):
-            continue
-        exact = []
-        for candidate in candidates:
-            if not isinstance(candidate, dict) or not candidate.get("id"):
+        query_string = urllib.parse.urlencode({"q": query})
+        endpoints = [
+            ("Douban", f"https://movie.douban.com/j/subject_suggest?{query_string}"),
+            ("Douban proxy", f"https://r.jina.ai/http://movie.douban.com/j/subject_suggest?{query_string}"),
+        ]
+        for source, url in endpoints:
+            request = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+                "Referer": "https://movie.douban.com/",
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            })
+            try:
+                with urllib.request.urlopen(request, timeout=25) as response:
+                    body = response.read().decode("utf-8-sig")
+            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError) as exc:
+                print(f"{source} lookup unavailable for {query!r}: {exc}")
                 continue
-            candidate_titles = {
-                normalize_title(str(candidate.get("title") or "")),
-                normalize_title(str(candidate.get("sub_title") or "")),
+            if source == "Douban proxy":
+                marker = "Markdown Content:"
+                if marker in body:
+                    body = body.split(marker, 1)[1].strip()
+            try:
+                candidates = json.loads(body)
+            except ValueError:
+                print(f"{source} returned unparseable suggestions for {query!r}")
+                continue
+            if not isinstance(candidates, list):
+                continue
+            exact = []
+            for candidate in candidates:
+                if not isinstance(candidate, dict) or not candidate.get("id"):
+                    continue
+                candidate_titles = {
+                    normalize_title(str(candidate.get("title") or "")),
+                    normalize_title(str(candidate.get("sub_title") or "")),
+                }
+                if not wanted.intersection(candidate_titles):
+                    continue
+                candidate["_original_title_match"] = bool(original_titles.intersection(candidate_titles))
+                candidate_type = str(candidate.get("type") or "").casefold()
+                if candidate_type and media_type == "movie" and candidate_type not in {"movie", "film"}:
+                    continue
+                if candidate_type and media_type == "tv" and candidate_type not in {"tv", "tv show", "tv series", "series"}:
+                    continue
+                exact.append(candidate)
+            if year:
+                same_year = [item for item in exact if str(item.get("year") or "").isdigit() and abs(int(item["year"]) - int(year)) <= 1]
+                if same_year:
+                    exact = same_year
+                elif exact and all(item.get("year") for item in exact) and not any(item.get("_original_title_match") for item in exact):
+                    continue
+            ids = {str(item["id"]) for item in exact}
+            if len(ids) != 1:
+                continue
+            result = next(item for item in exact if str(item["id"]) in ids)
+            subject_id = str(result["id"])
+            return {
+                "doubanId": subject_id,
+                "doubanUrl": f"https://movie.douban.com/subject/{subject_id}/",
+                "doubanPosterUrl": str(result.get("pic") or result.get("img") or ""),
             }
-            if not wanted.intersection(candidate_titles):
-                continue
-            candidate["_original_title_match"] = bool(original_titles.intersection(candidate_titles))
-            candidate_type = str(candidate.get("type") or "").casefold()
-            if candidate_type and media_type == "movie" and candidate_type not in {"movie", "film"}:
-                continue
-            if candidate_type and media_type == "tv" and candidate_type not in {"tv", "tv show", "tv series", "series"}:
-                continue
-            exact.append(candidate)
-        if year:
-            same_year = [
-                item for item in exact
-                if str(item.get("year") or "").isdigit()
-                and abs(int(item["year"]) - int(year)) <= 1
-            ]
-            if same_year:
-                exact = same_year
-            elif exact and all(item.get("year") for item in exact) and not any(item.get("_original_title_match") for item in exact):
-                continue
-        # If multiple same-title subjects remain, leave the link unresolved.
-        ids = {str(item["id"]) for item in exact}
-        if len(ids) != 1:
-            continue
-        result = next(item for item in exact if str(item["id"]) in ids)
-        subject_id = str(result["id"])
-        return {
-            "doubanId": subject_id,
-            "doubanUrl": f"https://movie.douban.com/subject/{subject_id}/",
-            "doubanPosterUrl": str(result.get("pic") or result.get("img") or ""),
-        }
     return None
 
 
@@ -402,9 +411,17 @@ def main() -> int:
         for show_id, match in pool.map(lookup_show, show_candidates.items()):
             if match:
                 show_douban[show_id] = match
-    matched_show_count = len(show_douban)
     build_tv_items(rows, films, areas, kinds, sources, show_douban)
-    print(f"Douban exact matches: {matched_movie_count} movie records / {len(movie_douban)} unique films, {matched_show_count} TV shows")
+    missing_links = [key for key, item in films.items() if not (item.get("doubanId") and item.get("doubanUrl") == f"https://movie.douban.com/subject/{item.get('doubanId')}/")]
+    for key in missing_links:
+        films.pop(key, None)
+        areas.pop(key, None)
+        kinds.pop(key, None)
+        sources.pop(key, None)
+        cross_sources.pop(key, None)
+    linked_movie_count = sum(1 for key in films if key.startswith("tmdb-"))
+    linked_show_count = sum(1 for key in films if key.startswith("tvmaze-"))
+    print(f"Douban direct links: {linked_movie_count} films / {linked_show_count} TV shows; excluded {len(missing_links)} items without an exact subject")
 
     payload = {
         "updatedAt": dt.datetime.now(BEIJING).isoformat(timespec="seconds"),
