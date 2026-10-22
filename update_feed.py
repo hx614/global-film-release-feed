@@ -194,7 +194,7 @@ def load_existing_douban_mappings() -> tuple[dict[str, dict], dict[str, dict]]:
 
 def get_movie_candidates(token: str, start: dt.date, end: dt.date) -> list[dict]:
     headers = tmdb_headers(token)
-    candidates: dict[tuple[int, str, int], dict] = {}
+    candidates: dict[tuple[int, int], dict] = {}
     for market, market_name in MARKETS:
         for release_type, kind in RELEASE_TYPES.items():
             for page in (1, 2):
@@ -213,8 +213,18 @@ def get_movie_candidates(token: str, start: dt.date, end: dt.date) -> list[dict]
                     date_string = movie.get("release_date")
                     if not date_string:
                         continue
-                    key = (int(movie["id"]), market, release_type)
-                    candidates[key] = {**movie, "market": market, "marketName": market_name, "releaseType": kind, "dateISO": date_string, "releaseTypeId": release_type}
+                    key = (int(movie["id"]), release_type)
+                    candidate = candidates.setdefault(key, {
+                        **movie,
+                        "releaseType": kind,
+                        "releaseTypeId": release_type,
+                        "releaseMarkets": {},
+                    })
+                    candidate["releaseMarkets"][market] = {
+                        "market": market,
+                        "region": market_name,
+                        "dateISO": date_string,
+                    }
                 if page >= min(int(data.get("total_pages", 1)), 2):
                     break
     return list(candidates.values())
@@ -226,14 +236,22 @@ def movie_record(movie: dict, details: dict) -> tuple[dict, str, str]:
     overview = plain_text(details.get("overview") or movie.get("overview") or "")
     if not overview:
         overview = "简介暂缺，详情请查看 TMDB 片目页。"
-    date_value = dt.date.fromisoformat(movie["dateISO"])
+    releases = sorted(movie.get("releaseMarkets", {}).values(), key=lambda release: (release["dateISO"], release["region"]))
+    if not releases:
+        releases = [{"market": movie.get("market", ""), "region": movie.get("marketName", ""), "dateISO": movie["dateISO"]}]
+    date_value = dt.date.fromisoformat(releases[0]["dateISO"])
+    release_regions = list(dict.fromkeys(release["region"] for release in releases))
     area = area_for([c.get("iso_3166_1", "") for c in details.get("production_countries", [])], details.get("original_language", ""))
     media = {
         "title": title,
         "original": original,
-        "platform": f"{movie['releaseType']}（{movie['marketName']}）",
+        "platform": f"{movie['releaseType']}（{'、'.join(release_regions)}）",
         "date": date_text(date_value),
-        "region": movie["marketName"],
+        "region": "、".join(release_regions),
+        "releaseMarkets": [
+            {"region": release["region"], "date": date_text(dt.date.fromisoformat(release["dateISO"]))}
+            for release in releases
+        ],
         "posterUrl": IMAGE + details["poster_path"] if details.get("poster_path") else "",
         "tmdbId": str(movie["id"]),
         "tmdbRating": f"{details['vote_average']:.1f}/10" if details.get("vote_count", 0) else "",
@@ -352,7 +370,7 @@ def main() -> int:
     matched_movie_count = 0
     for movie in movies:
         item, area, source = movie_record(movie, details_by_id[int(movie["id"])])
-        key = f"tmdb-{movie['id']}-{movie['market'].lower()}-{movie['releaseTypeId']}-{movie['dateISO']}"
+        key = f"tmdb-{movie['id']}-{movie['releaseTypeId']}"
         if movie_douban.get(str(movie["id"])):
             item.update(movie_douban[str(movie["id"])])
             matched_movie_count += 1
