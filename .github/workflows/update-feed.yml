@@ -1,0 +1,40 @@
+name: Update daily film release feed
+
+on:
+  schedule:
+    # 01:10 Beijing time (GitHub cron uses UTC).
+    - cron: "10 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-release-feed
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feed repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch release dates and episode schedules
+        env:
+          TMDB_READ_ACCESS_TOKEN: ${{ secrets.TMDB_READ_ACCESS_TOKEN }}
+        run: python update_feed.py
+      - name: Publish changed JSON
+        run: |
+          if git diff --quiet -- releases.json; then
+            echo "No feed changes today."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add releases.json
+          git commit -m "Update daily film release feed"
+          git push
