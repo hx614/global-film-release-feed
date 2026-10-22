@@ -177,6 +177,7 @@ def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -
                 "doubanId": subject_id,
                 "doubanUrl": f"https://movie.douban.com/subject/{subject_id}/",
                 "doubanPosterUrl": str(result.get("pic") or result.get("img") or ""),
+                "doubanTitle": plain_text(str(result.get("title") or result.get("sub_title") or "")),
             }
     return None
 
@@ -237,6 +238,10 @@ def get_movie_candidates(token: str, start: dt.date, end: dt.date) -> list[dict]
                 if page >= min(int(data.get("total_pages", 1)), 2):
                     break
     return list(candidates.values())
+
+
+def has_chinese(value: str) -> bool:
+    return any("\u3400" <= char <= "\u9fff" for char in value)
 
 
 def movie_record(movie: dict, details: dict) -> tuple[dict, str, str]:
@@ -328,8 +333,12 @@ def build_tv_items(rows: list[tuple[str, dt.date, dict]], films: dict, areas: di
         episode_name = episode.get("name") or ""
         summary = plain_text(episode.get("summary") or show.get("summary") or "简介暂缺，详情请查看 TVmaze 片目页。")
         image = (show.get("image") or {}).get("original") or (show.get("image") or {}).get("medium") or ""
+        douban_title = (douban_by_show.get(str(show_id)) or {}).get("doubanTitle", "")
+        display_title = douban_title if has_chinese(douban_title) else plain_text(title)
+        if not has_chinese(display_title):
+            display_title = f"中文译名待确认 · {display_title}"
         films[item_id] = {
-            "title": plain_text(title),
+            "title": display_title,
             "original": plain_text(title),
             "platform": f"{channel_name}（{market_name}）",
             "date": date_text(air_date),
@@ -339,6 +348,7 @@ def build_tv_items(rows: list[tuple[str, dt.date, dict]], films: dict, areas: di
         }
         if douban_by_show.get(str(show_id)):
             films[item_id].update(douban_by_show[str(show_id)])
+            films[item_id].pop("doubanTitle", None)
         films[item_id]["tvmazeId"] = str(show_id)
         country_info = (channel.get("country") or {}).get("code") or country
         areas[item_id] = area_for([country_info], show.get("language", ""))
@@ -368,6 +378,20 @@ def main() -> int:
         movie_ids = sorted({int(movie["id"]) for movie in movies})
         detail_rows = pool.map(lambda movie_id: (movie_id, fetch_json(f"{TMDB}/movie/{movie_id}?language=zh-CN", tmdb_headers(token))), movie_ids)
         details_by_id = dict(detail_rows)
+    untranslated_ids = [movie_id for movie_id, detail in details_by_id.items() if not has_chinese(plain_text(detail.get("title") or ""))]
+    def fetch_movie_translation(movie_id: int):
+        translations = fetch_json(f"{TMDB}/movie/{movie_id}/translations", tmdb_headers(token)).get("translations", [])
+        ordered = sorted(translations, key=lambda item: {"CN": 0, "TW": 1, "HK": 2}.get(str(item.get("iso_3166_1") or ""), 3))
+        for entry in ordered:
+            if entry.get("iso_639_1") == "zh":
+                translated = plain_text((entry.get("data") or {}).get("title") or "")
+                if has_chinese(translated):
+                    return movie_id, translated
+        return movie_id, ""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        for movie_id, translated in pool.map(fetch_movie_translation, untranslated_ids):
+            if translated:
+                details_by_id[movie_id]["title"] = translated
     movie_douban: dict[str, dict] = dict(old_movie_links)
     missing_movie_ids = [movie_id for movie_id in movie_ids if str(movie_id) not in movie_douban]
     def lookup_movie(movie_id: int):
@@ -387,6 +411,11 @@ def main() -> int:
         if movie_douban.get(str(movie["id"])):
             item.update(movie_douban[str(movie["id"])])
             matched_movie_count += 1
+        if not has_chinese(item["title"]):
+            douban_title = item.pop("doubanTitle", "")
+            item["title"] = douban_title if has_chinese(douban_title) else f"中文译名待确认 · {item['title']}"
+        else:
+            item.pop("doubanTitle", None)
         films[key] = item
         areas[key] = area
         kinds[key] = "电影"
@@ -412,16 +441,12 @@ def main() -> int:
             if match:
                 show_douban[show_id] = match
     build_tv_items(rows, films, areas, kinds, sources, show_douban)
-    missing_links = [key for key, item in films.items() if not (item.get("doubanId") and item.get("doubanUrl") == f"https://movie.douban.com/subject/{item.get('doubanId')}/")]
-    for key in missing_links:
-        films.pop(key, None)
-        areas.pop(key, None)
-        kinds.pop(key, None)
-        sources.pop(key, None)
-        cross_sources.pop(key, None)
-    linked_movie_count = sum(1 for key in films if key.startswith("tmdb-"))
-    linked_show_count = sum(1 for key in films if key.startswith("tvmaze-"))
-    print(f"Douban direct links: {linked_movie_count} films / {linked_show_count} TV shows; excluded {len(missing_links)} items without an exact subject")
+    # A Douban match enriches a record with a verified direct subject URL. An
+    # unmatched release remains in the feed and has no Douban link.
+    linked_movie_count = sum(1 for key, item in films.items() if key.startswith("tmdb-") and item.get("doubanId") and item.get("doubanUrl") == f"https://movie.douban.com/subject/{item.get('doubanId')}/")
+    linked_show_count = sum(1 for key, item in films.items() if key.startswith("tvmaze-") and item.get("doubanId") and item.get("doubanUrl") == f"https://movie.douban.com/subject/{item.get('doubanId')}/")
+    missing_link_count = len(films) - linked_movie_count - linked_show_count
+    print(f"Douban direct links: {linked_movie_count} films / {linked_show_count} TV shows; retained {missing_link_count} releases without a verified subject link")
 
     payload = {
         "updatedAt": dt.datetime.now(BEIJING).isoformat(timespec="seconds"),
