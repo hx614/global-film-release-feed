@@ -239,7 +239,11 @@ def movie_record(movie: dict, details: dict) -> tuple[dict, str, str]:
     releases = sorted(movie.get("releaseMarkets", {}).values(), key=lambda release: (release["dateISO"], release["region"]))
     if not releases:
         releases = [{"market": movie.get("market", ""), "region": movie.get("marketName", ""), "dateISO": movie["dateISO"]}]
-    date_value = dt.date.fromisoformat(releases[0]["dateISO"])
+    today = dt.datetime.now(BEIJING).date()
+    release_dates = [dt.date.fromisoformat(release["dateISO"]) for release in releases]
+    date_value = next((date for date in release_dates if date == today), None)
+    if date_value is None:
+        date_value = next((date for date in release_dates if date > today), release_dates[-1])
     release_regions = list(dict.fromkeys(release["region"] for release in releases))
     area = area_for([c.get("iso_3166_1", "") for c in details.get("production_countries", [])], details.get("original_language", ""))
     media = {
