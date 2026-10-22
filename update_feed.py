@@ -110,6 +110,27 @@ def normalize_title(value: str) -> str:
     return "".join(char for char in value if char.isalnum())
 
 
+def translate_title_to_chinese(value: str) -> str:
+    """Best-effort fallback for a release title without a catalog translation."""
+    value = plain_text(value).strip()
+    if not value or has_chinese(value):
+        return value
+    query = urllib.parse.urlencode({"client": "gtx", "sl": "auto", "tl": "zh-CN", "dt": "t", "q": value})
+    request = urllib.request.Request(
+        f"https://translate.googleapis.com/translate_a/single?{query}",
+        headers={"User-Agent": "GlobalFilmRelease/1.0", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            result = json.loads(response.read().decode("utf-8"))
+        translated = "".join(str(part[0]) for part in (result[0] or []) if part and part[0])
+        translated = plain_text(translated)
+        return translated if has_chinese(translated) else ""
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, IndexError, TypeError) as exc:
+        print(f"Title translation unavailable for {value!r}: {exc}")
+        return ""
+
+
 def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -> dict | None:
     """Resolve one exact Douban subject, retrying through a fetch proxy if needed."""
     wanted = {normalize_title(title) for title in titles if normalize_title(title)}
@@ -317,7 +338,7 @@ def tvmaze_days(start: dt.date, end: dt.date) -> list[tuple[str, dt.date, dict]]
     return found
 
 
-def build_tv_items(rows: list[tuple[str, dt.date, dict]], films: dict, areas: dict, kinds: dict, sources: dict, douban_by_show: dict[str, dict]):
+def build_tv_items(rows: list[tuple[str, dt.date, dict]], films: dict, areas: dict, kinds: dict, sources: dict, douban_by_show: dict[str, dict], chinese_titles: dict[str, str]):
     for country, air_date, episode in rows:
         show = episode.get("show") or {}
         show_id = show.get("id")
@@ -334,7 +355,7 @@ def build_tv_items(rows: list[tuple[str, dt.date, dict]], films: dict, areas: di
         summary = plain_text(episode.get("summary") or show.get("summary") or "简介暂缺，详情请查看 TVmaze 片目页。")
         image = (show.get("image") or {}).get("original") or (show.get("image") or {}).get("medium") or ""
         douban_title = (douban_by_show.get(str(show_id)) or {}).get("doubanTitle", "")
-        display_title = douban_title if has_chinese(douban_title) else plain_text(title)
+        display_title = douban_title if has_chinese(douban_title) else chinese_titles.get(str(show_id), plain_text(title))
         if not has_chinese(display_title):
             display_title = f"中文译名待确认 · {display_title}"
         films[item_id] = {
@@ -392,6 +413,14 @@ def main() -> int:
         for movie_id, translated in pool.map(fetch_movie_translation, untranslated_ids):
             if translated:
                 details_by_id[movie_id]["title"] = translated
+    machine_translation_ids = [movie_id for movie_id, detail in details_by_id.items() if not has_chinese(plain_text(detail.get("title") or ""))]
+    machine_translation_inputs = {movie_id: plain_text(details_by_id[movie_id].get("original_title") or details_by_id[movie_id].get("title") or "") for movie_id in machine_translation_ids}
+    unique_machine_titles = list(dict.fromkeys(value for value in machine_translation_inputs.values() if value))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        translated_titles = dict(zip(unique_machine_titles, pool.map(translate_title_to_chinese, unique_machine_titles)))
+    for movie_id, original_title in machine_translation_inputs.items():
+        if translated_titles.get(original_title):
+            details_by_id[movie_id]["title"] = translated_titles[original_title]
     movie_douban: dict[str, dict] = dict(old_movie_links)
     missing_movie_ids = [movie_id for movie_id in movie_ids if str(movie_id) not in movie_douban]
     def lookup_movie(movie_id: int):
@@ -440,7 +469,12 @@ def main() -> int:
         for show_id, match in pool.map(lookup_show, show_candidates.items()):
             if match:
                 show_douban[show_id] = match
-    build_tv_items(rows, films, areas, kinds, sources, show_douban)
+    tv_title_inputs = {show_id: title for show_id, (title, _) in show_candidates.items() if not has_chinese(title) and not has_chinese(plain_text((show_douban.get(show_id) or {}).get("doubanTitle", "")))}
+    unique_tv_titles = list(dict.fromkeys(tv_title_inputs.values()))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+        translated_tv_titles = dict(zip(unique_tv_titles, pool.map(translate_title_to_chinese, unique_tv_titles)))
+    chinese_tv_titles = {show_id: translated_tv_titles.get(title, "") for show_id, title in tv_title_inputs.items()}
+    build_tv_items(rows, films, areas, kinds, sources, show_douban, chinese_tv_titles)
     # A Douban match enriches a record with a verified direct subject URL. An
     # unmatched release remains in the feed and has no Douban link.
     linked_movie_count = sum(1 for key, item in films.items() if key.startswith("tmdb-") and item.get("doubanId") and item.get("doubanUrl") == f"https://movie.douban.com/subject/{item.get('doubanId')}/")
