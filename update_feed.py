@@ -146,7 +146,11 @@ def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -
                 continue
             exact.append(candidate)
         if year:
-            same_year = [item for item in exact if str(item.get("year") or "") == year]
+            same_year = [
+                item for item in exact
+                if str(item.get("year") or "").isdigit()
+                and abs(int(item["year"]) - int(year)) <= 1
+            ]
             if same_year:
                 exact = same_year
             elif any(item.get("year") for item in exact):
