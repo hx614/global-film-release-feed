@@ -118,9 +118,10 @@ def douban_match(titles: list[str], year: str = "", media_type: str = "movie") -
     for query in queries:
         url = "https://movie.douban.com/j/subject_suggest?" + urllib.parse.urlencode({"q": query})
         request = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; GlobalFilmRelease/1.0)",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
             "Referer": "https://movie.douban.com/",
-            "Accept": "application/json",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         })
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
